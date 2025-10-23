@@ -1,3 +1,3 @@
-#include <practice/hello_world.hpp>
+#include <practice/demo/hello_world.hpp>
 
-int main() { practice::hello_world::greeting(); }
+int main() { practice::demo::hello_world(); }
