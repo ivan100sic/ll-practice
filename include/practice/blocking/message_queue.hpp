@@ -1,6 +1,5 @@
 #pragma once
 
-#include <fcntl.h>
 #include <mqueue.h>
 #include <string>
 
@@ -17,7 +16,10 @@ public:
   MessageQueue(const MessageQueue &) = delete;
   MessageQueue &operator=(const MessageQueue &) = delete;
 
-  void send(std::string data) const;
+  MessageQueue(MessageQueue &&);
+  MessageQueue &operator=(MessageQueue &&);
+
+  bool send(std::string data) const;
   std::string receive() const;
 
 private:
