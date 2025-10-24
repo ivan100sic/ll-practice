@@ -5,8 +5,8 @@
 
 namespace practice::blocking {
 
-MessageQueue::MessageQueue(std::string name) : m_name(std::move(name)) {
-  m_fd = mq_open(m_name.c_str(), O_RDWR | O_CREAT, 0777, NULL);
+MessageQueue::MessageQueue(const std::string &name) {
+  m_fd = mq_open(name.c_str(), O_RDWR | O_CREAT, 0777, NULL);
   if (m_fd == -1) {
     throw std::runtime_error{"Failed to open message queue: " +
                              std::to_string(errno)};
