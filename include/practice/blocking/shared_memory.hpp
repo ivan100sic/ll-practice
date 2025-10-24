@@ -18,7 +18,7 @@ public:
   SharedMemory(SharedMemory &&);
   SharedMemory &operator=(SharedMemory &&);
 
-  volatile char *get() const;
+  volatile void *get() const;
 
   static bool unlink(const std::string &name);
 

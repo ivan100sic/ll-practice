@@ -9,7 +9,7 @@ namespace practice::blocking {
 
 SharedMemory::SharedMemory(const std::string &name, size_t length)
     : m_length(length) {
-  m_fd = shm_open(name.c_str(), O_RDWR, 0777);
+  m_fd = shm_open(name.c_str(), O_CREAT | O_RDWR, 0777);
   if (m_fd == -1) {
     throw std::runtime_error{"Failed to open shared memory: " +
                              std::to_string(errno)};
@@ -52,6 +52,8 @@ SharedMemory &SharedMemory::operator=(SharedMemory &&that) {
   that.m_ptr = NULL;
   return *this;
 }
+
+volatile void *SharedMemory::get() const { return m_ptr; }
 
 bool SharedMemory::unlink(const std::string &name) {
   return shm_unlink(name.c_str()) == 0;
