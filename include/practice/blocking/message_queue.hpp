@@ -10,7 +10,7 @@ namespace practice::blocking {
  */
 class MessageQueue {
 public:
-  MessageQueue(const std::string &name);
+  MessageQueue(std::string name);
   ~MessageQueue();
 
   MessageQueue(const MessageQueue &) = delete;
@@ -19,10 +19,12 @@ public:
   MessageQueue(MessageQueue &&);
   MessageQueue &operator=(MessageQueue &&);
 
-  bool send(std::string data) const;
+  bool send(std::string_view data) const;
   std::string receive() const;
+  bool unlink() const;
 
 private:
+  std::string m_name;
   mqd_t m_fd = -1;
 };
 

@@ -5,10 +5,11 @@
 
 namespace practice::blocking {
 
-MessageQueue::MessageQueue(const std::string &name) {
-  m_fd = mq_open(name.c_str(), O_RDWR | O_CREAT);
+MessageQueue::MessageQueue(std::string name) : m_name(std::move(name)) {
+  m_fd = mq_open(m_name.c_str(), O_RDWR | O_CREAT, 0777, NULL);
   if (m_fd == -1) {
-    throw std::runtime_error{"Failed to open message queue"};
+    throw std::runtime_error{"Failed to open message queue: " +
+                             std::to_string(errno)};
   }
 }
 
@@ -28,19 +29,23 @@ MessageQueue &MessageQueue::operator=(MessageQueue &&that) {
   return *this;
 }
 
-bool MessageQueue::send(std::string data) const {
+bool MessageQueue::send(std::string_view data) const {
   int res = mq_send(m_fd, data.data(), data.size(), 0);
   return res == 0;
 }
 
 std::string MessageQueue::receive() const {
-  char buf[512];
+  char buf[8192];
   int bytes = mq_receive(m_fd, buf, sizeof(buf), NULL);
   if (bytes == -1) {
-    throw std::runtime_error{"Failed to receive message"};
+    throw std::runtime_error{"Failed to receive message: " +
+                             std::to_string(errno)};
+
   } else {
     return std::string(buf, buf + bytes);
   }
 }
+
+bool MessageQueue::unlink() const { return mq_unlink(m_name.c_str()) == 0; }
 
 } // namespace practice::blocking
