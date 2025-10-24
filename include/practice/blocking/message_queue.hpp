@@ -21,7 +21,8 @@ public:
 
   bool send(std::string_view data) const;
   std::string receive() const;
-  bool unlink() const;
+
+  static bool unlink(const std::string &name);
 
 private:
   std::string m_name;

@@ -45,8 +45,8 @@ int main(int argc, char **argv) {
     }
   } else {
     // assume cleanup
-    MessageQueue(OldQueue).unlink();
-    MessageQueue(UpQueueName).unlink();
-    MessageQueue(DownQueueeName).unlink();
+    MessageQueue::unlink(OldQueue);
+    MessageQueue::unlink(UpQueueName);
+    MessageQueue::unlink(DownQueueeName);
   }
 }

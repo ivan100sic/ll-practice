@@ -46,6 +46,8 @@ std::string MessageQueue::receive() const {
   }
 }
 
-bool MessageQueue::unlink() const { return mq_unlink(m_name.c_str()) == 0; }
+bool MessageQueue::unlink(const std::string &name) {
+  return mq_unlink(name.c_str()) == 0;
+}
 
 } // namespace practice::blocking
