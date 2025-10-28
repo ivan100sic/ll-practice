@@ -250,6 +250,109 @@ void main() {
 
 } // namespace store_reordering
 
+namespace intel_example {
+
+static constexpr size_t Separation = 4096;
+
+struct Context {
+  std::atomic_bool go_flag_1;
+  std::atomic_bool go_flag_2;
+  std::atomic_bool abort_flag;
+  std::atomic_bool t1_done;
+  std::atomic_bool t2_done;
+
+  char separation_0[Separation];
+
+  std::atomic_int slot1;
+
+  char separation_1[Separation];
+
+  std::atomic_int slot2;
+
+  char separation_2[Separation];
+
+  std::atomic_int result1;
+
+  char separation_3[Separation];
+
+  std::atomic_int result2;
+};
+
+template <class Strength> void thread1(Context *ctx) {
+  while (!ctx->abort_flag) {
+    while (!ctx->go_flag_1.exchange(false))
+      ;
+    ctx->slot1.store(1, Strength::Store);
+    int val = ctx->slot2.load(Strength::Load);
+    ctx->result1.store(val, Strength::Store);
+    ctx->t1_done = true;
+  }
+}
+
+template <class Strength> void thread2(Context *ctx) {
+  while (!ctx->abort_flag) {
+    while (!ctx->go_flag_2.exchange(false))
+      ;
+    ctx->slot2.store(1, Strength::Store);
+    int val = ctx->slot1.load(Strength::Load);
+    ctx->result2.store(val, Strength::Store);
+    ctx->t2_done = true;
+  }
+}
+
+template <class Strength> void driver() {
+  Context ctx;
+  ctx.go_flag_1 = false;
+  ctx.go_flag_2 = false;
+  ctx.abort_flag = false;
+  ctx.t1_done = false;
+  ctx.t2_done = false;
+
+  int steps = MaxSteps;
+
+  std::thread t1(thread1<Strength>, &ctx);
+  std::thread t2(thread2<Strength>, &ctx);
+
+  std::map<std::pair<int, int>, int> counts;
+  for (int step = 0; step < MaxSteps; step++) {
+    ctx.slot1 = 0;
+    ctx.slot2 = 0;
+    if (step == MaxSteps - 1) {
+      ctx.abort_flag = true;
+    }
+    ctx.t1_done = false;
+    ctx.t2_done = false;
+    ctx.go_flag_1 = true;
+    ctx.go_flag_2 = true;
+
+    while (!(ctx.t1_done && ctx.t2_done))
+      ;
+
+    counts[{ctx.result1.load(), ctx.result2.load()}]++;
+  }
+
+  std::cerr << typeid(Strength).name() << '\n';
+  std::cerr << "counts:\n";
+  for (auto [key, val] : counts) {
+    std::cerr << key.first << ' ' << key.second << ": " << val << '\n';
+  }
+
+  t1.join();
+  t2.join();
+}
+
+/**
+ * At last, a conclusive demo.
+ * In the seq-cst ordering, the (0, 0) case is impossible.
+ */
+void main() {
+  driver<orders::Weak>();
+  driver<orders::Intermediate>();
+  driver<orders::Strong>();
+}
+
+} // namespace intel_example
+
 } // namespace demos
 
-int main(int argc, char **argv) { demos::store_reordering::main(); }
+int main(int argc, char **argv) { demos::intel_example::main(); }
