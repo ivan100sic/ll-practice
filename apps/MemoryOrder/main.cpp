@@ -1,5 +1,6 @@
 #include <atomic>
 #include <iostream>
+#include <map>
 #include <thread>
 
 namespace demos {
@@ -116,6 +117,8 @@ template <class Strength> void driver() {
  * Unfortunately this demo is inconclusive.
  * I was unable to reproduce the example shown here:
  * https://en.cppreference.com/w/cpp/atomic/memory_order.html#:~:text=Explanation-,Relaxed%20ordering,-Atomic%20operations%20tagged
+ *
+ * Probably because x86 has strong memory ordering.
  */
 void main() {
   driver<orders::Weak>();
@@ -125,6 +128,109 @@ void main() {
 
 } // namespace relaxed
 
+namespace store_reordering {
+
+static constexpr size_t Separation = 4096;
+
+struct Context {
+  std::atomic_bool go_flag_1;
+  std::atomic_bool go_flag_2;
+  std::atomic_bool abort_flag;
+  std::atomic_bool t1_done;
+  std::atomic_bool t2_done;
+
+  char separation_0[Separation];
+
+  std::atomic_int x1;
+
+  char separation_1[Separation];
+
+  std::atomic_int y1;
+
+  char separation_2[Separation];
+
+  std::atomic_int x2;
+
+  char separation_3[Separation];
+
+  std::atomic_int y2;
+};
+
+template <class Strength> void thread1(Context *ctx) {
+  while (!ctx->abort_flag) {
+    while (!ctx->go_flag_1.exchange(false))
+      ;
+    ctx->x1.store(1, Strength::Store);
+    ctx->y1.store(2, Strength::Store);
+    ctx->t1_done = true;
+  }
+}
+
+template <class Strength> void thread2(Context *ctx) {
+  while (!ctx->abort_flag) {
+    while (!ctx->go_flag_2.exchange(false))
+      ;
+    int x = ctx->x1.load(Strength::Load);
+    int y = ctx->y1.load(Strength::Load);
+    ctx->x2.store(x, Strength::Store);
+    ctx->y2.store(y, Strength::Store);
+    ctx->t2_done = true;
+  }
+}
+
+template <class Strength> void driver() {
+  Context ctx;
+  ctx.go_flag_1 = false;
+  ctx.go_flag_2 = false;
+  ctx.abort_flag = false;
+  ctx.t1_done = false;
+  ctx.t2_done = false;
+
+  int steps = MaxSteps;
+
+  std::thread t1(thread1<Strength>, &ctx);
+  std::thread t2(thread2<Strength>, &ctx);
+
+  std::map<std::pair<int, int>, int> counts;
+  for (int step = 0; step < MaxSteps; step++) {
+    ctx.x1 = 0;
+    ctx.y1 = 0;
+    if (step == MaxSteps - 1) {
+      ctx.abort_flag = true;
+    }
+    ctx.t1_done = false;
+    ctx.t2_done = false;
+    ctx.go_flag_1 = true;
+    ctx.go_flag_2 = true;
+
+    while (!(ctx.t1_done && ctx.t2_done))
+      ;
+
+    counts[{ctx.x2.load(), ctx.y2.load()}]++;
+  }
+
+  std::cerr << typeid(Strength).name() << '\n';
+  std::cerr << "counts:\n";
+  for (auto [key, val] : counts) {
+    std::cerr << key.first << ' ' << key.second << ": " << val << '\n';
+  }
+
+  t1.join();
+  t2.join();
+}
+
+/**
+ * It looks like store reorderings for different variables
+ * can happen regardless of the chosen memory ordering.
+ */
+void main() {
+  driver<orders::Weak>();
+  driver<orders::Intermediate>();
+  driver<orders::Strong>();
+}
+
+} // namespace store_reordering
+
 } // namespace demos
 
-int main(int argc, char **argv) { demos::relaxed::main(); }
+int main(int argc, char **argv) { demos::store_reordering::main(); }
