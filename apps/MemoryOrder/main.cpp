@@ -166,19 +166,25 @@ template <class Strength> void thread1(Context *ctx) {
   }
 }
 
-template <class Strength> void thread2(Context *ctx) {
+template <class Strength, bool ReverseLoading> void thread2(Context *ctx) {
   while (!ctx->abort_flag) {
     while (!ctx->go_flag_2.exchange(false))
       ;
-    int x = ctx->x1.load(Strength::Load);
-    int y = ctx->y1.load(Strength::Load);
+    int x, y;
+    if constexpr (ReverseLoading) {
+      y = ctx->y1.load(Strength::Load);
+      x = ctx->x1.load(Strength::Load);
+    } else {
+      x = ctx->x1.load(Strength::Load);
+      y = ctx->y1.load(Strength::Load);
+    }
     ctx->x2.store(x, Strength::Store);
     ctx->y2.store(y, Strength::Store);
     ctx->t2_done = true;
   }
 }
 
-template <class Strength> void driver() {
+template <class Strength, bool ReverseLoading> void driver() {
   Context ctx;
   ctx.go_flag_1 = false;
   ctx.go_flag_2 = false;
@@ -189,7 +195,7 @@ template <class Strength> void driver() {
   int steps = MaxSteps;
 
   std::thread t1(thread1<Strength>, &ctx);
-  std::thread t2(thread2<Strength>, &ctx);
+  std::thread t2(thread2<Strength, ReverseLoading>, &ctx);
 
   std::map<std::pair<int, int>, int> counts;
   for (int step = 0; step < MaxSteps; step++) {
@@ -209,7 +215,8 @@ template <class Strength> void driver() {
     counts[{ctx.x2.load(), ctx.y2.load()}]++;
   }
 
-  std::cerr << typeid(Strength).name() << '\n';
+  std::cerr << typeid(Strength).name()
+            << (ReverseLoading ? " reverse\n" : " same\n");
   std::cerr << "counts:\n";
   for (auto [key, val] : counts) {
     std::cerr << key.first << ' ' << key.second << ": " << val << '\n';
@@ -222,11 +229,23 @@ template <class Strength> void driver() {
 /**
  * It looks like store reorderings for different variables
  * can happen regardless of the chosen memory ordering.
+ *
+ * Silly me. This is absolutely expected. If the two threads
+ * execute the instructions in the order
+ *   L1, S1, S2, L2
+ * then this happens.
+ *
+ * However, if we load the variables x, y in reverse order, the (0, 2) case
+ * becomes impossible. It should be possible on some architectures, though.
  */
 void main() {
-  driver<orders::Weak>();
-  driver<orders::Intermediate>();
-  driver<orders::Strong>();
+  driver<orders::Weak, false>();
+  driver<orders::Intermediate, false>();
+  driver<orders::Strong, false>();
+
+  driver<orders::Weak, true>();
+  driver<orders::Intermediate, true>();
+  driver<orders::Strong, true>();
 }
 
 } // namespace store_reordering
