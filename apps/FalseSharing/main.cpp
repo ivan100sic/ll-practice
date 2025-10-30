@@ -67,6 +67,13 @@ template <size_t Gap> struct GappedQuadruple {
   Context c3;
 };
 
+template <> struct GappedQuadruple<0> {
+  Context c0;
+  Context c1;
+  Context c2;
+  Context c3;
+};
+
 struct Integers {
   uint64_t next = 0;
 
@@ -124,10 +131,21 @@ template <size_t Gap> void driver() {
 }
 
 void main() {
+  static_assert(sizeof(Context) == 16);
+  std::cerr << "Gap 0 B\n";
+  driver<0>();
+
   std::cerr << "Gap 1 B\n";
   driver<1>();
+
+  std::cerr << "Gap 48 B\n";
+  driver<48>();
+
   std::cerr << "Gap 64 B\n";
   driver<64>();
+
+  std::cerr << "Gap 4096 B\n";
+  driver<4096>();
 }
 
 } // namespace false_sharing
